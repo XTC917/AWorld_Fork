@@ -322,10 +322,7 @@ class Agent(BaseAgent[Observation, List[ActionModel]]):
                                                params=params,
                                                policy_info=content))
         else:
-            if not content:
-                logger.warning("LLM response content is empty, returning fallback message.")
-                content = "很抱歉，我暂时无法回答你的问题。"
-            else:
+            if content:
                 content = content.replace("```json", "").replace("```", "")
             # no tool call, agent name is itself.
             results.append(ActionModel(agent_name=self.id(), policy_info=content))
