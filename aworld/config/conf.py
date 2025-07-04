@@ -107,11 +107,11 @@ class BaseConfig(BaseModel):
 
 
 class ModelConfig(BaseConfig):
-    llm_provider: str = None
-    llm_model_name: str = None
+    llm_provider: str = "qwen3"
+    llm_model_name: str = "/dfs/data/aisz/panhui9/cache_dir/mogao/Qwen3-235B-A22B-FP8"
     llm_temperature: float = 1.
-    llm_base_url: str = None
-    llm_api_key: str = None
+    llm_base_url: str = "https://modelfactory.lenovo.com/app-workspace-172-1749106801220-vscode/v1"
+    llm_api_key: str = ""  # 如有API Key请填写
     llm_client_type: ClientType = ClientType.SDK
     llm_sync_enabled: bool = True
     llm_async_enabled: bool = True
