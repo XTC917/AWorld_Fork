@@ -32,6 +32,10 @@ async def stream_run(request: ChatCompletionRequest):
     if request.messages and request.messages[-1].trace_id is None:
         request.messages[-1].trace_id = request.trace_id
 
+    # 后端兜底：如果 model 为空，自动用 qwen3_agent
+    if not request.model:
+        request.model = "qwen3_agent"
+
     logger.info(f"Stream run agent: request={request.model_dump_json()}")
     agent = agent_loader.get_agent(request.model)
     instance: BaseAWorldAgent = agent.instance

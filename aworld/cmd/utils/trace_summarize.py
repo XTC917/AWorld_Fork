@@ -31,10 +31,10 @@ trace_prompt = """
     """
 
 agent_config = AgentConfig(
-    llm_provider="qwen3",
-    llm_model_name="/dfs/data/aisz/panhui9/cache_dir/mogao/Qwen3-235B-A22B-FP8",
-    llm_base_url="https://modelfactory.lenovo.com/app-workspace-172-1749106801220-vscode/v1",
-    llm_api_key=""  # 如有API Key请填写
+    llm_provider=os.getenv("LLM_PROVIDER_TRACE", os.getenv("LLM_PROVIDER", "openai")),
+    llm_model_name=os.getenv("LLM_MODEL_NAME_TRACE") or os.getenv("LLM_MODEL_NAME") or "qwen:7b",
+    llm_base_url=os.getenv("LLM_BASE_URL_TRACE") or os.getenv("LLM_BASE_URL") or "http://localhost:11434/v1",
+    llm_api_key=os.getenv("LLM_API_KEY_TRACE") or os.getenv("LLM_API_KEY") or ""
 )
 
 trace_agent = Agent(
