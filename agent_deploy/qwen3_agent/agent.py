@@ -9,27 +9,24 @@ class AWorldAgent:
         return "千问本地大模型 Agent (Ollama qwen:7b)"
 
     async def run(self, prompt=None, request=None):
-        # 获取用户输入
-        if prompt:
-            user_input = prompt
-        elif request and request.messages:
-            user_input = request.messages[-1].content
+        # 构造多轮对话历史
+        if request and request.messages:
+            messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        elif prompt:
+            messages = [{"role": "user", "content": prompt}]
         else:
-            user_input = ""
-        # 调用本地 Ollama API
+            messages = []
+
         url = "http://localhost:11434/v1/chat/completions"
         payload = {
             "model": "qwen:7b",
-            "messages": [
-                {"role": "user", "content": user_input}
-            ]
+            "messages": messages
         }
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(url, json=payload, timeout=60)
                 response.raise_for_status()
                 data = response.json()
-                # Ollama 返回格式兼容
                 if "choices" in data and data["choices"]:
                     content = data["choices"][0]["message"]["content"]
                     yield content
