@@ -181,7 +181,7 @@ if __name__ == "__main__":
             llm_temperature = os.getenv("LLM_TEMPERATURE", 0.0)
 
             def send_output(output):
-                with open(output_file, "a") as f:
+                with open(output_file, "a", encoding="utf-8") as f:
                     f.write(f"{output}\n")
 
             async for i in GaiaAgentRunner(
