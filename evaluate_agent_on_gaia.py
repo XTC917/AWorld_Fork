@@ -26,7 +26,7 @@ class GaiaLlmAgentEvaluator:
                 llm_api_key="",
                 async_enabled=True,  # 必须在 ModelConfig 里
             ),
-            system_prompt="你是一个有用的AI助手。",
+            system_prompt="你是一个知识渊博的AI助手，请严格按照如下要求回答：1. 只输出最终答案，不要输出推理过程。2. 答案必须用<answer>标签包裹，例如<answer>42</answer>。3. 请不要因为保守而随意拒绝回答，查不到的也尽量估计。实在无法回答可以输出<answer>无法回答</answer>。",
             agent_prompt="请用中文简明扼要地回答用户问题。",
         )
         self.agent = Agent(
@@ -97,14 +97,20 @@ class GaiaLlmAgentEvaluator:
 
     def score_answer(self, predicted: str, correct: str) -> bool:
         import re
-        predicted = predicted.lower().strip()
-        correct = correct.lower().strip()
-        if predicted == correct:
+        predicted = predicted.strip()
+        correct = correct.strip()
+        # 如果都是纯数字，只允许全等
+        if predicted.isdigit() and correct.isdigit():
+            return predicted == correct
+        # 其它情况再用宽松规则
+        predicted_l = predicted.lower()
+        correct_l = correct.lower()
+        if predicted_l == correct_l:
             return True
-        if correct in predicted or predicted in correct:
+        if correct_l in predicted_l or predicted_l in correct_l:
             return True
-        pred_clean = re.sub(r'[^\w]', '', predicted)
-        corr_clean = re.sub(r'[^\w]', '', correct)
+        pred_clean = re.sub(r'[^\w]', '', predicted_l)
+        corr_clean = re.sub(r'[^\w]', '', correct_l)
         if pred_clean == corr_clean:
             return True
         return False
@@ -228,7 +234,7 @@ class GaiaLlmAgentEvaluator:
 async def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_questions', type=int, default=166)
+    parser.add_argument('--max_questions', type=int, default=5)
     args = parser.parse_args()
     evaluator = GaiaLlmAgentEvaluator()
     await evaluator.run_evaluation(max_questions=args.max_questions)

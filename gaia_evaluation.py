@@ -18,6 +18,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'agent_deploy'))
 # 导入agent
 from qwen3_agent.agent import AWorldAgent
 
+# 新增：AWorld llm_agent自动用工具的评测流程
+from aworld.agents.llm_agent import Agent as LLM_Agent
+from aworld.core.common import Observation, StatefulObservation
+from aworld.core.tool.tool_desc import get_tool_desc
+from aworld.config.conf import AgentConfig, ModelConfig
+from aworld.core.context.base import Context
+
 QWEN3_API_URL = "https://modelfactory.lenovo.com/app-workspace-172-1749106801220-vscode/v1/chat/completions"
 
 class GaiaEvaluator:
@@ -361,12 +368,102 @@ class GaiaEvaluator:
         print(f"\n📋 评测报告已生成: {report_file}")
         print(f"📊 总体准确率: {accuracy:.2f}% ({correct}/{total})")
 
+class GaiaLlmAgentEvaluator:
+    def __init__(self, tool_names=None):
+        self.results = []
+        # 工具名列表，自动获取所有已注册工具
+        if tool_names is None:
+            tool_names = list(get_tool_desc().keys())
+        # 构造最小可用AgentConfig
+        conf = AgentConfig(
+            name="llm_agent",
+            llm_config=ModelConfig(
+                llm_provider="qwen-openai",
+                llm_model_name="qwen-turbo",
+                llm_api_key="sk-xxx",  # 你可以改成自己的key
+                llm_base_url="https://api.openai.com/v1"
+            ),
+            system_prompt="你是一个善于使用工具的AI助手。",
+            agent_prompt="你是一个善于使用工具的AI助手。"
+        )
+        self.agent = LLM_Agent(conf=conf, name="llm_agent", tool_names=tool_names)
+
+    async def call_agent(self, question: str) -> str:
+        obs = StatefulObservation(content=question, context=[])
+        # llm_agent支持async_run
+        try:
+            result = await self.agent.async_run(obs)
+            # result.answer 可能是最终答案
+            return getattr(result, 'answer', str(result))
+        except Exception as e:
+            return f"[llm_agent调用失败] {e}"
+
+    async def evaluate_single_question(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        question = item["Question"]
+        correct_answer = item["Final answer"]
+        task_id = item["task_id"]
+        level = item["Level"]
+        print(f"\n🔍 [llm_agent] 评测问题 {task_id} (Level {level}):")
+        print(f"问题: {question[:100]}...")
+        response = await self.call_agent(question)
+        predicted_answer = response.strip()
+        is_correct = predicted_answer.lower() == correct_answer.lower()
+        result = {
+            "task_id": task_id,
+            "level": level,
+            "question": question,
+            "correct_answer": correct_answer,
+            "predicted_answer": predicted_answer,
+            "full_response": response,
+            "is_correct": is_correct
+        }
+        status = "✅" if is_correct else "❌"
+        print(f"{status} 预测: {predicted_answer} | 正确答案: {correct_answer}")
+        return result
+
+    async def run_evaluation(self, max_questions: int = 10):
+        print("🚀 [llm_agent] 开始 GAIA 工具链评测...")
+        dataset_path = "examples/gaia/GAIA/2023/metadata.jsonl"
+        dataset = []
+        if not os.path.exists(dataset_path):
+            print(f"❌ 数据集文件不存在: {dataset_path}")
+            return
+        with open(dataset_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                if line.strip():
+                    item = json.loads(line)
+                    dataset.append(item)
+        if max_questions > 0:
+            dataset = dataset[:max_questions]
+        print(f"📊 将评测 {len(dataset)} 个问题")
+        accuracy = 0.0
+        correct_count = 0
+        for i, item in enumerate(dataset, 1):
+            try:
+                result = await self.evaluate_single_question(item)
+                self.results.append(result)
+                correct_count = sum(1 for r in self.results if r["is_correct"])
+                accuracy = correct_count / len(self.results) * 100
+                print(f"📈 进度: {i}/{len(dataset)} | 准确率: {accuracy:.1f}% ({correct_count}/{len(self.results)})")
+                await asyncio.sleep(1)
+            except Exception as e:
+                print(f"❌ 评测问题 {item.get('task_id', 'unknown')} 失败: {e}")
+                continue
+        print(f"\n📊 [llm_agent] 工具链评测准确率: {accuracy:.2f}% ({correct_count}/{len(self.results)})")
+
+# 主函数支持两种评测模式
 async def main():
-    """主函数"""
-    evaluator = GaiaEvaluator()
-    
-    # 运行评测（限制前10题，避免时间过长）
-    await evaluator.run_evaluation(max_questions=165)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mode', choices=['qwen3', 'llm_agent'], default='qwen3', help='选择评测模式')
+    parser.add_argument('--max_questions', type=int, default=10)
+    args = parser.parse_args()
+    if args.mode == 'llm_agent':
+        evaluator = GaiaLlmAgentEvaluator()
+        await evaluator.run_evaluation(max_questions=args.max_questions)
+    else:
+        evaluator = GaiaEvaluator()
+        await evaluator.run_evaluation(max_questions=args.max_questions)
 
 if __name__ == "__main__":
     asyncio.run(main()) 

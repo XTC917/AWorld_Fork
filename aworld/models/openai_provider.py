@@ -23,7 +23,7 @@ class OpenAIProvider(LLMProviderBase):
         """
         # Get API key
         api_key = self.api_key
-        if not api_key:
+        if not api_key and self.kwargs.get("client_type", ClientType.SDK) != ClientType.HTTP:
             env_var = "OPENAI_API_KEY"
             api_key = os.getenv(env_var, "")
             if not api_key:
@@ -38,9 +38,10 @@ class OpenAIProvider(LLMProviderBase):
             logger.info(f"Using HTTP provider for OpenAI")
             self.http_provider = LLMHTTPHandler(
                 base_url=base_url,
-                api_key=api_key,
+                api_key=api_key or "none",  # 允许无key
                 model_name=self.model_name,
-                max_retries=self.kwargs.get("max_retries", 3)
+                max_retries=self.kwargs.get("max_retries", 3),
+                verify_ssl=False  # 关闭SSL校验
             )
             self.is_http_provider = True
             return self.http_provider
@@ -60,7 +61,7 @@ class OpenAIProvider(LLMProviderBase):
         """
         # Get API key
         api_key = self.api_key
-        if not api_key:
+        if not api_key and self.kwargs.get("client_type", ClientType.SDK) != ClientType.HTTP:
             env_var = "OPENAI_API_KEY"
             api_key = os.getenv(env_var, "")
             if not api_key:
@@ -70,12 +71,17 @@ class OpenAIProvider(LLMProviderBase):
         if not base_url:
             base_url = os.getenv("OPENAI_ENDPOINT", "https://api.openai.com/v1")
 
-        return AsyncOpenAI(
-            api_key=api_key,
-            base_url=base_url,
-            timeout=self.kwargs.get("timeout", 180),
-            max_retries=self.kwargs.get("max_retries", 3)
-        )
+        if self.kwargs.get("client_type", ClientType.SDK) == ClientType.HTTP:
+            # HTTP handler已在同步分支处理，异步分支不需要
+            logger.info(f"Using HTTP provider for OpenAI (async)")
+            return None
+        else:
+            return AsyncOpenAI(
+                api_key=api_key,
+                base_url=base_url,
+                timeout=self.kwargs.get("timeout", 180),
+                max_retries=self.kwargs.get("max_retries", 3)
+            )
 
     @classmethod
     def supported_models(cls) -> list[str]:

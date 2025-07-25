@@ -1023,4 +1023,3 @@ class Agent(BaseAgent[Observation, List[ActionModel]]):
                     f"Agent#{self.id()}, 💬 tool_call_id: {tool_call_id} ")
 
 
-
