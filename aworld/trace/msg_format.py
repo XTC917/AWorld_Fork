@@ -11,6 +11,7 @@ from typing import Any, Literal, TypeVar
 from typing_extensions import NotRequired, TypedDict
 from .constants import MESSAGE_FORMATTED_VALUE_LENGTH_LIMIT
 from .stack_info import get_user_frame_and_stacklevel
+from typing import Union
 
 Truncatable = TypeVar('Truncatable', str, bytes, 'list[Any]', 'tuple[Any, ...]')
 
@@ -54,7 +55,7 @@ class ChunksFormatter(Formatter):
         kwargs: dict[str, Any],
         *,
         fstring_frame: types.FrameType = None,
-    ) -> tuple[list[LiteralChunk | ArgChunk], dict[str, Any], str]:
+    ) -> tuple[list[Union[LiteralChunk, ArgChunk]], dict[str, Any], str]:
         # Returns
         # 1. A list of chunks
         # 2. A dictionary of extra attributes to add to the span/log.
